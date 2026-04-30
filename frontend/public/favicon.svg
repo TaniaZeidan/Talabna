@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Terracotta circle background -->
+  <circle cx="32" cy="32" r="30" fill="#c75d2c"/>
+  <!-- Inner cream ring -->
+  <circle cx="32" cy="32" r="22" fill="none" stroke="#f6f1e8" stroke-width="1.5" opacity="0.4"/>
+  <!-- Stylized "T" with steam/motion lines -->
+  <g fill="#f6f1e8">
+    <!-- T crossbar -->
+    <rect x="18" y="20" width="28" height="4" rx="1"/>
+    <!-- T stem (slightly italic) -->
+    <path d="M 30 24 L 28 46 L 34 46 L 36 24 Z"/>
+    <!-- Three steam/motion dots above -->
+    <circle cx="22" cy="14" r="1.5" opacity="0.6"/>
+    <circle cx="32" cy="12" r="1.8" opacity="0.85"/>
+    <circle cx="42" cy="14" r="1.5" opacity="0.6"/>
+  </g>
+</svg>
