@@ -12,6 +12,8 @@ const notif    = require('../controllers/notification.controller');
 /* ----------- Public auth (FR-C1, FR-C2) ----------- */
 router.post('/auth/register', auth.register);
 router.post('/auth/login',    auth.login);
+router.post('/auth/reset-password/request', auth.requestPasswordReset);
+router.post('/auth/reset-password/confirm', auth.confirmPasswordReset);
 router.get ('/auth/me',       authenticate, auth.me);
 
 /* ----------- Public browsing (FR-C3) ----------- */
@@ -31,15 +33,27 @@ router.post ('/vendor/orders/:id/confirm', authenticate, requireRole('vendor'), 
 router.post ('/vendor/orders/:id/reject',  authenticate, requireRole('vendor'), order.rejectOrder);
 router.post ('/vendor/orders/:id/prepare', authenticate, requireRole('vendor'), order.updatePrepStatus);
 router.get  ('/vendor/analytics',       authenticate, requireRole('vendor'), vendor.analytics);
+router.get  ('/vendor/daily-summary',  authenticate, requireRole('vendor'), vendor.dailySummary);
+router.get  ('/vendor/monthly-overview', authenticate, requireRole('vendor'), vendor.monthlyOverview);
 
 /* ----------- Customer-only (FR-C4..C9) ----------- */
 router.post('/orders',            authenticate, requireRole('customer'), order.placeOrder);
 router.get ('/orders/me',         authenticate, requireRole('customer'), order.myOrders);
+router.post('/orders/:id/cancel', authenticate, requireRole('customer'), order.cancelOrder);
 router.get ('/orders/:id',        authenticate, order.getOrder);
 
 router.get ('/loyalty/me',        authenticate, requireRole('customer'), customer.myLoyalty);
 router.post('/reviews',           authenticate, requireRole('customer'), customer.submitReview);
 router.get ('/recommendations',   authenticate, requireRole('customer'), customer.recommend);
+router.get ('/meal-combos',       authenticate, requireRole('customer'), customer.mealCombos);
+
+// Favorites
+router.get   ('/favorites',           authenticate, requireRole('customer'), customer.listFavorites);
+router.post  ('/favorites',           authenticate, requireRole('customer'), customer.addFavorite);
+router.delete('/favorites/:id',       authenticate, requireRole('customer'), customer.removeFavorite);
+
+// Multi-store ordering
+router.post('/orders/multi-store',    authenticate, requireRole('customer'), customer.placeMultiStoreOrder);
 
 // Shared cart / group order (FR-C8)
 router.post  ('/carts',                  authenticate, requireRole('customer'), customer.createSharedCart);

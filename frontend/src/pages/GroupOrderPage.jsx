@@ -119,7 +119,7 @@ export function GroupOrderPage() {
               {products.map(p => (
                 <div key={p.productID} className="product-card-pro">
                   <div className="product-card-image">
-                    <img src={getProductImage(p.name, p.category)} alt={p.name} onError={handleImgError} />
+                    <img src={getProductImage(p.name, p.category, p.imageUrl)} alt={p.name} onError={handleImgError} />
                     <span className="product-card-cat">{p.category}</span>
                   </div>
                   <div className="product-card-body">
@@ -159,7 +159,7 @@ export function GroupOrderPage() {
                       const product = productMap[it.productID];
                       return (
                         <div key={it.cartItemID} className="cart-pro-item">
-                          {product && <img src={getProductImage(product.name, product.category)} alt={it.name} className="cart-pro-thumb" onError={handleImgError} />}
+                          {product && <img src={getProductImage(product.name, product.category, product.imageUrl)} alt={it.name} className="cart-pro-thumb" onError={handleImgError} />}
                           <div className="cart-pro-item-body">
                             <div className="cart-pro-item-name">{it.name}</div>
                             <div className="cart-pro-item-price">× {it.quantity} · added by {it.contributor}</div>

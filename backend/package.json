@@ -1,7 +1,7 @@
 {
   "name": "mvd-backend",
   "version": "1.0.0",
-  "description": "Multi-Vendor Delivery Web Application — Backend API",
+  "description": "Talabna — Backend API",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
@@ -15,7 +15,8 @@
     "express": "^4.19.2",
     "express-rate-limit": "^7.4.0",
     "jsonwebtoken": "^9.0.2",
-    "mysql2": "^3.11.0"
+    "mysql2": "^3.11.0",
+    "nodemailer": "^6.9.14"
   },
   "devDependencies": {
     "jest": "^29.7.0",

@@ -1,9 +1,10 @@
 const db = require('../config/db');
 const { AppError, asyncHandler } = require('../middleware/error');
-const { recommendForUser } = require('../services/recommendation.service');
+const { recommendForUser, buildMealCombos } = require('../services/recommendation.service');
 const { notify } = require('../services/notification.service');
 
 const REDEEM_VALUE = 0.10; // FR-C7
+const DELIVERY_FEE = 2.00;
 
 /* ============================================================
  *  Loyalty (FR-C7)
@@ -67,10 +68,146 @@ exports.vendorReviews = asyncHandler(async (req, res) => {
  */
 exports.recommend = asyncHandler(async (req, res) => {
   const budget = req.query.budget ? Number(req.query.budget) : null;
+  const mood   = req.query.mood || null; // 'comfort' | 'healthy' | 'quick'
   if (req.query.budget && (Number.isNaN(budget) || budget <= 0))
     throw new AppError('Invalid budget');
-  const result = await recommendForUser(req.user.userID, budget);
+  if (mood && !['comfort','healthy','quick'].includes(mood))
+    throw new AppError('Invalid mood');
+  const result = await recommendForUser(req.user.userID, budget, mood);
   res.json(result);
+});
+
+/* ============================================================
+ *  Budget-based meal combos (FR — "What can I eat with $X?")
+ * ============================================================
+ */
+exports.mealCombos = asyncHandler(async (req, res) => {
+  const budget = Number(req.query.budget);
+  if (!budget || Number.isNaN(budget) || budget <= 0)
+    throw new AppError('Provide a valid positive budget');
+  const combos = await buildMealCombos(budget);
+  res.json({ budget, combos });
+});
+
+/* ============================================================
+ *  Favorites (save / unsave / list)
+ * ============================================================
+ */
+exports.listFavorites = asyncHandler(async (req, res) => {
+  const [rows] = await db.query(`
+    SELECT v.vendorID, v.businessName, v.address, v.category, v.rating
+    FROM favorites f
+    JOIN vendors v ON v.vendorID = f.vendorID
+    WHERE f.userID = ? AND v.status = 'approved'
+    ORDER BY f.createdAt DESC`, [req.user.userID]);
+  res.json(rows);
+});
+
+exports.addFavorite = asyncHandler(async (req, res) => {
+  const { vendorID } = req.body;
+  if (!vendorID) throw new AppError('vendorID required');
+  const [[v]] = await db.query("SELECT vendorID FROM vendors WHERE vendorID = ? AND status = 'approved'", [vendorID]);
+  if (!v) throw new AppError('Vendor not found', 404);
+  await db.query('INSERT IGNORE INTO favorites (userID, vendorID) VALUES (?, ?)', [req.user.userID, vendorID]);
+  res.status(201).json({ message: 'Favorited' });
+});
+
+exports.removeFavorite = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  await db.query('DELETE FROM favorites WHERE userID = ? AND vendorID = ?', [req.user.userID, id]);
+  res.json({ message: 'Unfavorited' });
+});
+
+/* ============================================================
+ *  Multi-store ordering (single session, multiple vendors)
+ *  Body: { groups: [ { vendorID, items: [...], scheduledTime?, redeemPoints? } ] }
+ * ============================================================
+ */
+exports.placeMultiStoreOrder = asyncHandler(async (req, res) => {
+  const customerID = req.user.userID;
+  const { groups, paymentMethod = 'cash' } = req.body;
+  if (!Array.isArray(groups) || !groups.length)
+    throw new AppError('Provide at least one vendor group');
+  if (groups.length === 1)
+    throw new AppError('Use the regular order endpoint for single-vendor orders');
+  if (!['cash', 'card'].includes(paymentMethod))
+    throw new AppError('paymentMethod must be "cash" or "card"');
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // Create the session order group
+    const [g] = await conn.query(
+      'INSERT INTO order_groups (customerID, totalPrice) VALUES (?, 0)', [customerID]);
+    const groupID = g.insertId;
+
+    let grandTotal = 0;
+    const createdOrders = [];
+
+    for (const grp of groups) {
+      const { vendorID, items, scheduledTime } = grp;
+      if (!vendorID || !Array.isArray(items) || !items.length)
+        throw new AppError('Each group must have vendorID and items');
+
+      if (scheduledTime) {
+        const dt = new Date(scheduledTime);
+        const h = dt.getHours();
+        if (Number.isNaN(dt.getTime()) || h < 9 || h >= 22)
+          throw new AppError('Scheduled time outside operational hours (9-22)');
+      }
+
+      let subtotal = 0;
+      for (const it of items) {
+        const [[p]] = await conn.query(
+          'SELECT price, vendorID FROM products WHERE productID = ?',
+          [it.productID]);
+        if (!p) throw new AppError(`Product ${it.productID} not found`, 404);
+        if (p.vendorID !== Number(vendorID))
+          throw new AppError('All items in a group must come from the same vendor');
+        subtotal += Number(p.price) * Number(it.quantity);
+        it._unitPrice = Number(p.price);
+      }
+      const total = Number(subtotal.toFixed(2));
+
+      const [oRes] = await conn.query(
+        `INSERT INTO orders (customerID, vendorID, orderStatus, totalPrice, scheduledTime, groupID, paymentMethod)
+         VALUES (?,?,?,?,?,?,?)`,
+        [customerID, vendorID, 'Pending', total, scheduledTime || null, groupID, paymentMethod]);
+      const orderID = oRes.insertId;
+
+      for (const it of items) {
+        await conn.query(
+          'INSERT INTO order_items (orderID, productID, quantity, unitPrice, specialInstructions) VALUES (?,?,?,?,?)',
+          [orderID, it.productID, it.quantity, it._unitPrice, it.specialInstructions || null]);
+      }
+      // For grouped orders, deliveries are created per-order but drivers won't see
+      // them until all vendors in the group have confirmed
+      await conn.query('INSERT INTO deliveries (orderID, status) VALUES (?, ?)', [orderID, 'Unassigned']);
+
+      grandTotal += total;
+      createdOrders.push({ orderID, vendorID, total });
+    }
+
+    grandTotal += DELIVERY_FEE;
+    await conn.query(
+      "UPDATE order_groups SET totalPrice = ?, status = 'pending_vendors' WHERE groupID = ?",
+      [grandTotal.toFixed(2), groupID]);
+    await conn.commit();
+
+    // Notify each vendor outside the transaction
+    for (const o of createdOrders) {
+      const [[vu]] = await db.query('SELECT userID FROM vendors WHERE vendorID = ?', [o.vendorID]);
+      if (vu) await notify(vu.userID, `New order #${o.orderID} placed (multi-store session)`, o.orderID);
+    }
+
+    res.status(201).json({ groupID, orders: createdOrders, grandTotal: Number(grandTotal.toFixed(2)) });
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
 });
 
 /* ============================================================
@@ -211,27 +348,23 @@ exports.checkoutSharedCart = asyncHandler(async (req, res) => {
 
     for (const [productID, quantity] of Object.entries(aggregated)) {
       const [[p]] = await conn.query(
-        'SELECT price, availability FROM products WHERE productID = ? FOR UPDATE', [productID]);
-      if (!p || p.availability < quantity)
-        throw new AppError(`Out of stock for product ${productID}`);
+        'SELECT price FROM products WHERE productID = ?', [productID]);
+      if (!p) throw new AppError(`Product ${productID} not found`);
       subtotal += Number(p.price) * Number(quantity);
       checkedItems.push({ productID, quantity, unitPrice: Number(p.price) });
     }
 
-    const total = Number(subtotal.toFixed(2));
+    const total = Number((subtotal + DELIVERY_FEE).toFixed(2));
     const [oRes] = await conn.query(
-      `INSERT INTO orders (customerID, vendorID, orderStatus, totalPrice, cartID)
-       VALUES (?,?,?,?,?)`,
-      [userID, cart.vendorID, 'Pending', total, id]);
+      `INSERT INTO orders (customerID, vendorID, orderStatus, totalPrice, cartID, deliveryFee)
+       VALUES (?,?,?,?,?,?)`,
+      [userID, cart.vendorID, 'Pending', total, id, DELIVERY_FEE]);
     const orderID = oRes.insertId;
 
     for (const it of checkedItems) {
       await conn.query(
         'INSERT INTO order_items (orderID, productID, quantity, unitPrice) VALUES (?,?,?,?)',
         [orderID, it.productID, it.quantity, it.unitPrice]);
-      await conn.query(
-        'UPDATE products SET availability = availability - ? WHERE productID = ?',
-        [it.quantity, it.productID]);
     }
 
     await conn.query('INSERT INTO deliveries (orderID, status) VALUES (?, ?)', [orderID, 'Unassigned']);

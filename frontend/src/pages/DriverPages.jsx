@@ -32,16 +32,30 @@ export function DriverAvailablePage() {
       {error && <div className="alert alert-error">{error}</div>}
       {available.length === 0 && <p className="muted">No deliveries available right now. Check back soon.</p>}
       {available.map(o => (
-        <div key={o.orderID} className="order-row">
+        <div key={o.orderID} className="order-row" style={o.isGroup ? { borderLeft: '3px solid var(--accent)' } : {}}>
           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <span className="id">#{o.orderID}</span>
-              <h4>{o.businessName}</h4>
+              {o.isGroup ? (
+                <>
+                  <span className="id" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    Multi-store pickup
+                    <span style={{ background: 'var(--accent)', color: 'var(--bg)', padding: '2px 8px', borderRadius: 100, fontSize: 10, fontWeight: 600 }}>
+                      {o.orderCount} stops
+                    </span>
+                  </span>
+                  <h4>{o.businessName}</h4>
+                </>
+              ) : (
+                <>
+                  <span className="id">#{o.orderID}</span>
+                  <h4>{o.businessName}</h4>
+                </>
+              )}
               <p className="muted" style={{ margin: 0, fontFamily: 'var(--font-mono)', fontSize: 12 }}>
                 Pickup: {o.pickupAddress} · ${Number(o.totalPrice).toFixed(2)}
               </p>
             </div>
-            <button className="btn btn-success btn-sm" onClick={() => accept(o.orderID)}>Accept →</button>
+            <button className="btn btn-success btn-sm" onClick={() => accept(o.isGroup ? `group-${o.groupID}` : o.orderID)}>Accept →</button>
           </div>
         </div>
       ))}

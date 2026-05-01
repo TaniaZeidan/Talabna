@@ -103,6 +103,9 @@ export default function LoginPage() {
             </button>
           </form>
 
+          <p className="auth-card-footer" style={{ marginBottom: 8 }}>
+            <Link to="/forgot-password" style={{ color: 'rgba(246, 241, 232, .55)' }}>Forgot password?</Link>
+          </p>
           <p className="auth-card-footer">
             New here? <Link to="/register">Create an account</Link>
           </p>

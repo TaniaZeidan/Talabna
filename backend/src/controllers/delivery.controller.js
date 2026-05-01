@@ -10,15 +10,47 @@ const POINTS_PER_DOLLAR = 1; // FR-C7
  * ============================================================
  */
 exports.availableDeliveries = asyncHandler(async (req, res) => {
-  // Orders that are ReadyForPickup and don't yet have a driver
-  const [rows] = await db.query(`
-    SELECT o.orderID, o.totalPrice, o.scheduledTime, v.businessName, v.address AS pickupAddress
+  // Single-vendor orders: ReadyForPickup + Unassigned (no group)
+  const [singles] = await db.query(`
+    SELECT o.orderID, o.totalPrice, o.scheduledTime, o.groupID,
+           v.businessName, v.address AS pickupAddress
     FROM orders o
     JOIN vendors v ON v.vendorID = o.vendorID
     JOIN deliveries d ON d.orderID = o.orderID
     WHERE o.orderStatus = 'ReadyForPickup' AND d.status = 'Unassigned'
+      AND o.groupID IS NULL
     ORDER BY o.createdAt ASC`);
-  res.json(rows);
+
+  // Grouped multi-store orders: show as one delivery when ALL vendors
+  // in the group have reached ReadyForPickup
+  const [groups] = await db.query(`
+    SELECT og.groupID, og.totalPrice, og.customerID,
+           GROUP_CONCAT(DISTINCT v.businessName SEPARATOR ' + ') AS businessName,
+           GROUP_CONCAT(DISTINCT v.address SEPARATOR ' → ') AS pickupAddress,
+           MIN(o.createdAt) AS createdAt,
+           COUNT(*) AS orderCount,
+           SUM(CASE WHEN o.orderStatus = 'ReadyForPickup' THEN 1 ELSE 0 END) AS readyCount
+    FROM order_groups og
+    JOIN orders o ON o.groupID = og.groupID
+    JOIN vendors v ON v.vendorID = o.vendorID
+    JOIN deliveries d ON d.orderID = o.orderID
+    WHERE og.status = 'ready_for_driver'
+      AND d.status = 'Unassigned'
+    GROUP BY og.groupID
+    HAVING readyCount = orderCount`);
+
+  const groupRows = groups.map(g => ({
+    orderID: `group-${g.groupID}`,
+    groupID: g.groupID,
+    totalPrice: g.totalPrice,
+    scheduledTime: null,
+    businessName: g.businessName,
+    pickupAddress: g.pickupAddress,
+    isGroup: true,
+    orderCount: g.orderCount,
+  }));
+
+  res.json([...singles, ...groupRows]);
 });
 
 exports.myDeliveries = asyncHandler(async (req, res) => {
@@ -40,30 +72,58 @@ exports.myDeliveries = asyncHandler(async (req, res) => {
  * ============================================================
  */
 exports.acceptDelivery = asyncHandler(async (req, res) => {
-  const { id } = req.params;            // orderID
+  const { id } = req.params;            // orderID or groupID
   const driverID = req.user.userID;
+
+  // Check if this is a group acceptance
+  const isGroupAccept = String(id).startsWith('group-');
 
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-    const [[d]] = await conn.query(
-      'SELECT deliveryID, status, driverID FROM deliveries WHERE orderID = ? FOR UPDATE', [id]);
-    if (!d) throw new AppError('Delivery not found', 404);
-    if (d.status !== 'Unassigned' || d.driverID)
-      throw new AppError('Delivery already assigned', 409);
 
-    const [[o]] = await conn.query(
-      'SELECT orderStatus, customerID FROM orders WHERE orderID = ?', [id]);
-    if (o.orderStatus !== 'ReadyForPickup')
-      throw new AppError('Order is not ready for pickup');
+    if (isGroupAccept) {
+      const groupID = Number(String(id).replace('group-', ''));
+      const [orders] = await conn.query(
+        'SELECT o.orderID, o.customerID FROM orders o WHERE o.groupID = ? FOR UPDATE', [groupID]);
+      if (!orders.length) throw new AppError('Group not found', 404);
 
-    await conn.query(
-      "UPDATE deliveries SET driverID = ?, status = 'Assigned' WHERE orderID = ?",
-      [driverID, id]);
+      for (const order of orders) {
+        const [[d]] = await conn.query(
+          'SELECT status, driverID FROM deliveries WHERE orderID = ? FOR UPDATE', [order.orderID]);
+        if (d.status !== 'Unassigned' || d.driverID)
+          throw new AppError('Delivery already assigned', 409);
+        await conn.query(
+          "UPDATE deliveries SET driverID = ?, status = 'Assigned' WHERE orderID = ?",
+          [driverID, order.orderID]);
+      }
+      await conn.query(
+        "UPDATE order_groups SET status = 'assigned' WHERE groupID = ?", [groupID]);
+      await conn.commit();
 
-    await conn.commit();
-    notify(o.customerID, `Driver assigned to order #${id}`, id);
-    res.json({ message: 'Delivery accepted' });
+      const customerID = orders[0].customerID;
+      notify(customerID, `Driver assigned to your multi-store order`, orders[0].orderID);
+      res.json({ message: 'Group delivery accepted' });
+    } else {
+      const [[d]] = await conn.query(
+        'SELECT deliveryID, status, driverID FROM deliveries WHERE orderID = ? FOR UPDATE', [id]);
+      if (!d) throw new AppError('Delivery not found', 404);
+      if (d.status !== 'Unassigned' || d.driverID)
+        throw new AppError('Delivery already assigned', 409);
+
+      const [[o]] = await conn.query(
+        'SELECT orderStatus, customerID FROM orders WHERE orderID = ?', [id]);
+      if (o.orderStatus !== 'ReadyForPickup')
+        throw new AppError('Order is not ready for pickup');
+
+      await conn.query(
+        "UPDATE deliveries SET driverID = ?, status = 'Assigned' WHERE orderID = ?",
+        [driverID, id]);
+
+      await conn.commit();
+      notify(o.customerID, `Driver assigned to order #${id}`, id);
+      res.json({ message: 'Delivery accepted' });
+    }
   } catch (err) {
     await conn.rollback();
     throw err;

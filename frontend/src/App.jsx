@@ -5,10 +5,12 @@ import { useAuth } from './context/AuthContext.jsx';
 
 import LoginPage    from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
+import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx';
+import MultiStoreCartPage from './pages/MultiStoreCartPage.jsx';
 
 import {
   CustomerHome, VendorDetailPage, MyOrdersPage,
-  LoyaltyPage, RecommendationsPage,
+  LoyaltyPage, RecommendationsPage, FavoritesPage,
 } from './pages/CustomerPages.jsx';
 import { GroupOrderPage } from './pages/GroupOrderPage.jsx';
 
@@ -41,6 +43,7 @@ export default function App() {
           <Route path="/" element={<HomeRedirect />} />
           <Route path="/login"    element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
           {/* Customer routes */}
           <Route path="/customer" element={
@@ -51,6 +54,12 @@ export default function App() {
           } />
           <Route path="/customer/orders" element={
             <ProtectedRoute allow={['customer']}><MyOrdersPage /></ProtectedRoute>
+          } />
+          <Route path="/customer/favorites" element={
+            <ProtectedRoute allow={['customer']}><FavoritesPage /></ProtectedRoute>
+          } />
+          <Route path="/customer/multi-store" element={
+            <ProtectedRoute allow={['customer']}><MultiStoreCartPage /></ProtectedRoute>
           } />
           <Route path="/customer/loyalty" element={
             <ProtectedRoute allow={['customer']}><LoyaltyPage /></ProtectedRoute>

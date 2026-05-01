@@ -1748,3 +1748,454 @@ body.on-auth-page:has(.auth-centered-register) .app {
 /* Tighter vertical rhythm inside the register card */
 .auth-card-wide .form-group { margin-bottom: 10px; }
 .auth-card-wide .row { gap: 12px; }
+
+/* =============================================================
+   Feature update: favorites, mood selector, meal combos, multi-store
+   ============================================================= */
+
+/* Heart button on vendor cards (top-left corner of cover photo) */
+.vendor-card-fav-btn {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(26, 20, 16, .55);
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .2s;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 3;
+  line-height: 1;
+}
+.vendor-card-fav-btn:hover { background: rgba(26, 20, 16, .8); transform: scale(1.08); }
+.vendor-card-fav-btn.on { color: var(--accent); background: rgba(246, 241, 232, .92); }
+.vendor-card-fav-btn.on:hover { background: rgba(246, 241, 232, 1); }
+
+/* Subtle accent ring around favorited vendor cards */
+.vendor-card-fav { box-shadow: 0 0 0 2px var(--accent), var(--shadow-sm); }
+
+/* Big "Save"/"Saved" button in vendor hero */
+.vendor-hero-fav {
+  background: rgba(246, 241, 232, .12);
+  color: var(--bg);
+  border: 1px solid rgba(246, 241, 232, .25);
+  padding: 10px 18px;
+  border-radius: 100px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all .2s;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  flex-shrink: 0;
+  align-self: flex-end;
+}
+.vendor-hero-fav:hover { background: rgba(246, 241, 232, .2); transform: translateY(-1px); }
+.vendor-hero-fav.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+.vendor-hero-fav.on:hover { background: var(--accent-dark); }
+
+/* =============================================================
+   Mood selector (recommendations page)
+   ============================================================= */
+.mood-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.mood-chip {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+  padding: 12px 20px;
+  border-radius: 100px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  transition: all .15s;
+}
+.mood-chip:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+.mood-chip.mood-active {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+.mood-chip .mood-icon { font-size: 18px; line-height: 1; }
+
+/* =============================================================
+   Meal combo cards
+   ============================================================= */
+.combo-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all .2s;
+}
+.combo-card:hover { border-color: var(--accent); box-shadow: var(--shadow-md); }
+
+.combo-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+.combo-card-vendor {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: var(--ink);
+}
+.combo-card-total {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.6rem;
+  color: var(--accent);
+  letter-spacing: -0.02em;
+}
+
+.combo-card-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.combo-card-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.combo-card-item img {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.combo-item-name { font-weight: 500; font-size: 14px; color: var(--ink); }
+.combo-item-price {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.combo-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+
+/* =============================================================
+   Product detail modal
+   ============================================================= */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 20, 16, .6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: fadeIn .2s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.modal-content {
+  background: var(--surface);
+  border-radius: 12px;
+  max-width: 520px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 24px 80px rgba(26, 20, 16, .3);
+  animation: slideUp .25s ease;
+}
+@keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(26, 20, 16, .6);
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  transition: all .15s;
+  line-height: 1;
+}
+.modal-close:hover { background: var(--danger); }
+
+.modal-image {
+  width: 100%;
+  height: 260px;
+  overflow: hidden;
+  border-radius: 12px 12px 0 0;
+}
+.modal-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.modal-body {
+  padding: 24px 28px 28px;
+}
+
+@media (max-width: 580px) {
+  .modal-content { max-width: 100%; margin: 0; border-radius: 0; max-height: 100vh; }
+  .modal-image { height: 200px; border-radius: 0; }
+}
+
+/* =============================================================
+   Cancel order button
+   ============================================================= */
+.btn-cancel-order {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all .15s;
+}
+.btn-cancel-order:hover { background: var(--danger); color: var(--bg); }
+
+/* =============================================================
+   Budget bar (For You page)
+   ============================================================= */
+.budget-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 100px;
+  padding: 8px 10px 8px 24px;
+  margin-bottom: 24px;
+  transition: all .2s;
+  box-shadow: var(--shadow-sm);
+  flex-wrap: wrap;
+}
+.budget-bar:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(199, 93, 44, .12), var(--shadow-md);
+}
+.budget-bar-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 140px;
+}
+.budget-bar-symbol {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.6rem;
+  color: var(--accent);
+  line-height: 1;
+}
+.budget-bar-field {
+  border: 0;
+  background: transparent;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.6rem;
+  color: var(--ink);
+  width: 80px;
+  outline: none;
+  padding: 6px 0;
+  letter-spacing: -0.02em;
+}
+.budget-bar-field::placeholder { color: var(--muted); font-weight: 400; }
+.budget-bar-field::-webkit-inner-spin-button,
+.budget-bar-field::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.budget-bar-field[type=number] { -moz-appearance: textfield; }
+.budget-bar-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+.budget-bar-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.budget-bar-actions .btn {
+  border-radius: 100px;
+  padding: 10px 18px;
+}
+
+/* =============================================================
+   Store search bar (vendor detail page)
+   ============================================================= */
+.store-search-bar {
+  display: flex;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 100px;
+  padding: 6px 14px 6px 20px;
+  margin-bottom: 24px;
+  transition: all .2s;
+  box-shadow: var(--shadow-sm);
+  gap: 8px;
+}
+.store-search-bar:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(199, 93, 44, .12), var(--shadow-md);
+}
+.store-search-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.store-search-input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  padding: 12px 8px;
+  font-size: 15px;
+  font-family: inherit;
+  color: var(--ink);
+  outline: none;
+  min-width: 120px;
+}
+.store-search-input::placeholder {
+  color: var(--muted);
+  font-style: italic;
+}
+.store-search-clear {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--bg-alt);
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .15s;
+  flex-shrink: 0;
+}
+.store-search-clear:hover { background: var(--accent); color: var(--bg); }
+.store-search-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--line);
+  flex-shrink: 0;
+}
+.store-search-price-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+.store-search-price {
+  border: 0;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  width: 56px;
+  outline: none;
+  padding: 8px 4px;
+}
+.store-search-price::placeholder { color: var(--muted); font-weight: 400; }
+.store-search-price::-webkit-inner-spin-button,
+.store-search-price::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.store-search-price[type=number] { -moz-appearance: textfield; }
+
+/* ===================== Payment method picker ===================== */
+.payment-method-picker {
+  display: flex;
+  gap: 8px;
+}
+.payment-method-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--ink-soft);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.payment-method-btn:hover {
+  border-color: var(--accent-soft);
+  color: var(--ink);
+}
+.payment-method-btn.active {
+  border-color: var(--accent);
+  background: rgba(196, 124, 72, 0.08);
+  color: var(--accent);
+}
+.payment-icon { font-size: 16px; }
+.card-form {
+  margin-top: 8px;
+  padding: 14px;
+  background: var(--bg-alt);
+  border-radius: 10px;
+  border: 1px solid var(--line);
+}

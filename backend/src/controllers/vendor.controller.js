@@ -65,14 +65,11 @@ async function getVendorIdForUser(userID) {
   return rows[0].vendorID;
 }
 
-function validateProductInput({ name, price, category, availability }) {
-  // FR-V2 rules
+function validateProductInput({ name, price, category }) {
   if (!name || !category) throw new AppError('Product name and category are required');
   if (price === undefined || price === null) throw new AppError('Price is required');
   if (Number(price) < 0)   throw new AppError('Price must be a positive numeric value');
   if (Number.isNaN(Number(price))) throw new AppError('Price must be numeric');
-  if (availability !== undefined && Number(availability) < 0)
-    throw new AppError('Stock cannot be negative');
 }
 
 exports.createProduct = asyncHandler(async (req, res) => {
@@ -155,5 +152,86 @@ exports.analytics = asyncHandler(async (req, res) => {
     totalRevenue:   Number(totals.totalRevenue),
     avgPrepMinutes: avgPrep.avgPrepMinutes ? Number(avgPrep.avgPrepMinutes).toFixed(1) : null,
     topProducts,
+  });
+});
+
+/* ----------- End-of-day summary ----------- */
+
+exports.dailySummary = asyncHandler(async (req, res) => {
+  const vendorID = await getVendorIdForUser(req.user.userID);
+  const dateParam = req.query.date || new Date().toISOString().slice(0, 10);
+
+  const [[summary]] = await db.query(`
+    SELECT COUNT(*) AS totalOrders,
+           COALESCE(SUM(CASE WHEN orderStatus = 'Delivered' THEN totalPrice ELSE 0 END), 0) AS revenue,
+           SUM(CASE WHEN orderStatus = 'Delivered' THEN 1 ELSE 0 END) AS delivered,
+           SUM(CASE WHEN orderStatus = 'Cancelled' THEN 1 ELSE 0 END) AS cancelled,
+           SUM(CASE WHEN orderStatus IN ('Pending','Confirmed','InPreparation','ReadyForPickup','OnTheWay') THEN 1 ELSE 0 END) AS active
+    FROM orders
+    WHERE vendorID = ? AND DATE(createdAt) = ?`, [vendorID, dateParam]);
+
+  const [topItems] = await db.query(`
+    SELECT p.name, SUM(oi.quantity) AS qty, SUM(oi.quantity * oi.unitPrice) AS revenue
+    FROM order_items oi
+    JOIN orders o ON oi.orderID = o.orderID
+    JOIN products p ON oi.productID = p.productID
+    WHERE o.vendorID = ? AND DATE(o.createdAt) = ? AND o.orderStatus = 'Delivered'
+    GROUP BY p.productID, p.name
+    ORDER BY qty DESC
+    LIMIT 5`, [vendorID, dateParam]);
+
+  res.json({
+    date: dateParam,
+    totalOrders: Number(summary.totalOrders),
+    revenue: Number(summary.revenue),
+    delivered: Number(summary.delivered),
+    cancelled: Number(summary.cancelled),
+    active: Number(summary.active),
+    topItems,
+  });
+});
+
+/* ----------- Monthly overview ----------- */
+
+exports.monthlyOverview = asyncHandler(async (req, res) => {
+  const vendorID = await getVendorIdForUser(req.user.userID);
+  const month = req.query.month || new Date().toISOString().slice(0, 7); // YYYY-MM
+
+  const [[summary]] = await db.query(`
+    SELECT COUNT(*) AS totalOrders,
+           COALESCE(SUM(CASE WHEN orderStatus = 'Delivered' THEN totalPrice ELSE 0 END), 0) AS revenue,
+           SUM(CASE WHEN orderStatus = 'Delivered' THEN 1 ELSE 0 END) AS delivered,
+           SUM(CASE WHEN orderStatus = 'Cancelled' THEN 1 ELSE 0 END) AS cancelled
+    FROM orders
+    WHERE vendorID = ? AND DATE_FORMAT(createdAt, '%Y-%m') = ?`, [vendorID, month]);
+
+  const [dailyBreakdown] = await db.query(`
+    SELECT DATE(createdAt) AS day,
+           COUNT(*) AS orders,
+           COALESCE(SUM(CASE WHEN orderStatus = 'Delivered' THEN totalPrice ELSE 0 END), 0) AS revenue
+    FROM orders
+    WHERE vendorID = ? AND DATE_FORMAT(createdAt, '%Y-%m') = ?
+    GROUP BY DATE(createdAt)
+    ORDER BY day ASC`, [vendorID, month]);
+
+  const [[bestSeller]] = await db.query(`
+    SELECT p.productID, p.name, p.imageUrl, SUM(oi.quantity) AS unitsSold,
+           SUM(oi.quantity * oi.unitPrice) AS revenue
+    FROM order_items oi
+    JOIN orders o ON oi.orderID = o.orderID
+    JOIN products p ON oi.productID = p.productID
+    WHERE o.vendorID = ? AND DATE_FORMAT(o.createdAt, '%Y-%m') = ? AND o.orderStatus = 'Delivered'
+    GROUP BY p.productID, p.name, p.imageUrl
+    ORDER BY unitsSold DESC
+    LIMIT 1`, [vendorID, month]);
+
+  res.json({
+    month,
+    totalOrders: Number(summary.totalOrders),
+    revenue: Number(summary.revenue),
+    delivered: Number(summary.delivered),
+    cancelled: Number(summary.cancelled),
+    dailyBreakdown,
+    bestSeller: bestSeller || null,
   });
 });

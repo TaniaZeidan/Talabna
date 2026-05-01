@@ -55,6 +55,8 @@ export function Navbar() {
           <>
             <Link to="/customer">Browse</Link>
             <Link to="/customer/orders">Orders</Link>
+            <Link to="/customer/favorites">♥ Favorites</Link>
+            <Link to="/customer/multi-store">Multi-store</Link>
             <Link to="/customer/loyalty">Rewards</Link>
             <Link to="/customer/recommendations">For you</Link>
             <Link to="/customer/group">Group</Link>
@@ -172,6 +174,8 @@ const PRODUCT_IMAGES = {
   'salmon roll':       'https://images.unsplash.com/photo-1617196034796-73dfa7b1fd56?w=600&q=80',
   'california roll':   'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=600&q=80',
   'miso soup':         'https://images.unsplash.com/photo-1547592180-85f173990554?w=600&q=80',
+  // Fresh, verified-working edamame photo (different from the previous broken one)
+  'edamame':           'https://images.unsplash.com/photo-1606728035253-49e8a23146de?w=600&q=80',
 };
 
 export function getCategoryImage(category) {
@@ -184,7 +188,8 @@ export function getCategoryImage(category) {
   return CATEGORY_IMAGES.default;
 }
 
-export function getProductImage(name, category) {
+export function getProductImage(name, category, imageUrl) {
+  if (imageUrl) return imageUrl;
   if (name) {
     const key = name.toLowerCase().trim();
     if (PRODUCT_IMAGES[key]) return PRODUCT_IMAGES[key];
@@ -200,4 +205,67 @@ export function handleImgError(e) {
   if (e.target.src !== FALLBACK_IMAGE) {
     e.target.src = FALLBACK_IMAGE;
   }
+}
+
+/* ===================== Credit card helpers ===================== */
+function luhnCheck(num) {
+  const digits = num.replace(/\D/g, '');
+  if (digits.length < 13 || digits.length > 19) return false;
+  let sum = 0;
+  let alt = false;
+  for (let i = digits.length - 1; i >= 0; i--) {
+    let n = parseInt(digits[i], 10);
+    if (alt) { n *= 2; if (n > 9) n -= 9; }
+    sum += n;
+    alt = !alt;
+  }
+  return sum % 10 === 0;
+}
+
+export function validateCard(cardNumber, cardExpiry, cardCvv) {
+  const errors = [];
+  const num = (cardNumber || '').replace(/\s/g, '');
+  if (!num) {
+    errors.push('Card number is required');
+  } else if (!/^\d{13,19}$/.test(num)) {
+    errors.push('Card number must be 13–19 digits');
+  } else if (!luhnCheck(num)) {
+    errors.push('Invalid card number');
+  }
+
+  const exp = (cardExpiry || '').trim();
+  if (!exp) {
+    errors.push('Expiry date is required');
+  } else if (!/^\d{2}\/\d{2}$/.test(exp)) {
+    errors.push('Expiry must be MM/YY');
+  } else {
+    const [mm, yy] = exp.split('/').map(Number);
+    if (mm < 1 || mm > 12) {
+      errors.push('Invalid expiry month');
+    } else {
+      const now = new Date();
+      const expDate = new Date(2000 + yy, mm);
+      if (expDate <= now) errors.push('Card is expired');
+    }
+  }
+
+  const cvv = (cardCvv || '').trim();
+  if (!cvv) {
+    errors.push('CVV is required');
+  } else if (!/^\d{3,4}$/.test(cvv)) {
+    errors.push('CVV must be 3 or 4 digits');
+  }
+
+  return errors;
+}
+
+export function formatCardNumber(value) {
+  const digits = value.replace(/\D/g, '').slice(0, 16);
+  return digits.replace(/(.{4})/g, '$1 ').trim();
+}
+
+export function formatExpiry(value) {
+  const digits = value.replace(/\D/g, '').slice(0, 4);
+  if (digits.length > 2) return digits.slice(0, 2) + '/' + digits.slice(2);
+  return digits;
 }
