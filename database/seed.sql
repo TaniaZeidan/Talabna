@@ -23,7 +23,7 @@ TRUNCATE TABLE users;
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- Bcrypt hash of "Pass123"
-SET @pwd = '$2b$12$Hk1hNCcHa6PsayOikMzQDuh4klRCTmOR3KQTJUgNRm9.tVybrwhhq';
+SET @pwd = '$2b$12$MdKVFjX8cIkOL52aAhwVsus2ul5Ub/7KE9GbHoH6kK0ZBlexNdAEC';
 
 -- USERS
 INSERT INTO users (username, password, email, phone, role, accountStatus) VALUES

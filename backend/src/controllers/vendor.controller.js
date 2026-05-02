@@ -98,10 +98,18 @@ exports.updateProduct = asyncHandler(async (req, res) => {
   validateProductInput({ ...req.body, name: req.body.name || 'placeholder' });
   const { name, description, price, category, availability, imageUrl } = req.body;
 
+  const fields = ['name=?', 'description=?', 'price=?', 'category=?', 'imageUrl=?'];
+  const params = [name, description, price, category, imageUrl ?? ''];
+
+  if (availability !== undefined && availability !== null) {
+    fields.push('availability=?');
+    params.push(availability);
+  }
+
+  params.push(id);
   await db.query(
-    `UPDATE products SET name=?, description=?, price=?, category=?, availability=?, imageUrl=?
-     WHERE productID = ?`,
-    [name, description, price, category, availability, imageUrl, id]
+    `UPDATE products SET ${fields.join(', ')} WHERE productID = ?`,
+    params
   );
   res.json({ message: 'Product updated' });
 });
